@@ -1,0 +1,19 @@
+controller:
+  replicaCount: 2
+
+  ingressClassResource:
+    name: nginx
+    default: true
+
+  # A conta AWS (plano Free) não permite criar Load Balancers, então usamos NodePort
+  # e testamos com: kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 8080:80
+  service:
+    type: NodePort
+
+  # Quando a conta liberar Load Balancers, troque o bloco acima por este
+  # (cria um Network Load Balancer público na AWS apontando para o controller):
+  # service:
+  #   type: LoadBalancer
+  #   annotations:
+  #     service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  #     service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing

@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics
+  namespace: analytics
+spec:
+  # Sem "replicas": quem controla a quantidade de pods é o KEDA (ScaledObject abaixo).
+  selector:
+    matchLabels:
+      app: analytics
+  template:
+    metadata:
+      labels:
+        app: analytics
+    spec:
+      # ServiceAccount criada pelo eksctl (IRSA): dá permissão de SQS e DynamoDB ao pod sem chave de acesso.
+      serviceAccountName: analytics-sa
+      containers:
+        - name: analytics
+          image: 217140917440.dkr.ecr.us-east-1.amazonaws.com/analytics-image:latest
+          envFrom:
+            - configMapRef:
+                name: configmap
+          # readiness: "pronto para receber tráfego?" Se falhar, o Service para de mandar requisições ao pod.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # liveness: "está vivo?" Se falhar 3 vezes seguidas, o kubelet reinicia o container.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "500m"
+          ports:
+            - containerPort: 8005
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics
+  namespace: analytics
+spec:
+  selector:
+    app: analytics
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8005
+      targetPort: 8005
+
+---
+# O KEDA lê o tamanho da fila com a permissão do próprio operador (ServiceAccount keda-operator com IRSA).
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: aws-credentials
+  namespace: analytics
+spec:
+  podIdentity:
+    provider: aws
+
+---
+# KEDA: o analytics só consome a fila, então escala pela quantidade de mensagens no SQS.
+# queueLength: "5" => 1 pod para cada 5 mensagens pendentes.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: analytics
+  namespace: analytics
+spec:
+  scaleTargetRef:
+    name: analytics
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: aws-credentials
+      metadata:
+        queueURL: "https://sqs.us-east-1.amazonaws.com/217140917440/evaluation-service-sqs"
+        queueLength: "5"
+        awsRegion: "us-east-1"

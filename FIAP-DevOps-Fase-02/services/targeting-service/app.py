@@ -1,204 +1,349 @@
+
 import os
 import sys
+import logging
+from functools import wraps
+
 import psycopg2
 import requests
-import json
-from psycopg2.extras import RealDictCursor, Json
-from psycopg2.pool import SimpleConnectionPool
-from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-from functools import wraps
-import logging
+from flask import Flask, jsonify, request
+from psycopg2.extras import Json, RealDictCursor
+from psycopg2.pool import SimpleConnectionPool
 
-# Configura o logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s"
+)
 log = logging.getLogger(__name__)
 
-# Carrega .env para desenvolvimento local
-load_dotenv() 
+load_dotenv()
 
 app = Flask(__name__)
 
-# --- Configuração ---
 DATABASE_URL = os.getenv("DATABASE_URL")
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "").rstrip("/")
 
 if not DATABASE_URL or not AUTH_SERVICE_URL:
-    log.critical("Erro: DATABASE_URL e AUTH_SERVICE_URL devem ser definidos.")
+    log.critical("DATABASE_URL e AUTH_SERVICE_URL devem ser definidos.")
     sys.exit(1)
 
-# --- Pool de Conexão com o Banco ---
 try:
     pool = SimpleConnectionPool(1, 5, dsn=DATABASE_URL)
-    log.info("Pool de conexões com o PostgreSQL (targeting) inicializado.")
-except psycopg2.OperationalError as e:
-    log.critical(f"Erro fatal ao conectar ao PostgreSQL: {e}")
+    log.info("Pool PostgreSQL do targeting-service inicializado.")
+except psycopg2.OperationalError:
+    log.exception("Falha ao inicializar conexão com PostgreSQL.")
     sys.exit(1)
 
-# --- Middleware de Autenticação (Idêntico ao flag-service) ---
+
 def require_auth(f):
-    """ Middleware para validar a chave de API contra o auth-service """
+    """Valida a chave de API usando o auth-service."""
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization")
+
         if not auth_header:
             return jsonify({"error": "Authorization header obrigatório"}), 401
-        
+
         try:
-            validate_url = f"{AUTH_SERVICE_URL}/validate"
-            response = requests.get(validate_url, headers={"Authorization": auth_header}, timeout=3)
-            
+            response = requests.get(
+                f"{AUTH_SERVICE_URL}/validate",
+                headers={"Authorization": auth_header},
+                timeout=3
+            )
+
             if response.status_code != 200:
-                log.warning(f"Falha na validação da chave (status: {response.status_code})")
+                log.warning(
+                    "Falha na validação da chave. Status: %s",
+                    response.status_code
+                )
                 return jsonify({"error": "Chave de API inválida"}), 401
-        
+
         except requests.exceptions.Timeout:
-            log.error("Timeout ao conectar com o auth-service")
-            return jsonify({"error": "Serviço de autenticação indisponível (timeout)"}), 504 # Gateway Timeout
-        except requests.exceptions.RequestException as e:
-            log.error(f"Erro ao conectar com o auth-service: {e}")
-            return jsonify({"error": "Serviço de autenticação indisponível"}), 503 # Service Unavailable
+            log.error("Timeout ao conectar com auth-service.")
+            return jsonify({
+                "error": "Serviço de autenticação indisponível (timeout)"
+            }), 504
+
+        except requests.exceptions.RequestException:
+            log.exception("Erro de comunicação com auth-service.")
+            return jsonify({
+                "error": "Serviço de autenticação indisponível"
+            }), 503
+
+        finally:
+            if "response" in locals():
+                response.close()
 
         return f(*args, **kwargs)
+
     return decorated
 
-# --- Endpoints da API ---
 
-@app.route('/health')
+def get_json_body():
+    """Obtém e valida um corpo JSON."""
+    if not request.is_json:
+        return None
+
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return None
+
+    return data
+
+
+def release_connection(conn, cursor=None, rollback=False):
+    """Fecha cursor e devolve conexão ao pool."""
+    if cursor is not None:
+        try:
+            cursor.close()
+        except psycopg2.Error:
+            log.exception("Erro ao fechar cursor PostgreSQL.")
+
+    if conn is not None:
+        try:
+            if rollback:
+                conn.rollback()
+
+            pool.putconn(conn)
+        except psycopg2.Error:
+            log.exception("Erro ao devolver conexão ao pool.")
+            try:
+                pool.putconn(conn, close=True)
+            except psycopg2.Error:
+                log.exception("Erro ao descartar conexão PostgreSQL.")
+
+
+@app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
 
-@app.route('/rules', methods=['POST'])
+
+@app.route("/rules", methods=["POST"])
 @require_auth
 def create_rule():
-    """ Cria uma nova regra de segmentação para uma flag """
-    data = request.get_json()
-    if not data or 'flag_name' not in data or 'rules' not in data:
-        return jsonify({"error": "'flag_name' e 'rules' (JSON) são obrigatórios"}), 400
-    
-    flag_name = data['flag_name']
-    rules_obj = data['rules'] # O objeto JSON
-    is_enabled = data.get('is_enabled', True)
-    
+    """Cria uma nova regra de segmentação."""
+    data = get_json_body()
+
+    if not data or "flag_name" not in data or "rules" not in data:
+        return jsonify({
+            "error": "'flag_name' e 'rules' (JSON) são obrigatórios"
+        }), 400
+
+    flag_name = data["flag_name"]
+    rules_obj = data["rules"]
+    is_enabled = data.get("is_enabled", True)
+
+    if not isinstance(flag_name, str) or not flag_name.strip():
+        return jsonify({"error": "flag_name deve ser um texto não vazio"}), 400
+
+    if len(flag_name) > 100:
+        return jsonify({"error": "flag_name deve ter no máximo 100 caracteres"}), 400
+
+    if not isinstance(rules_obj, (dict, list)):
+        return jsonify({"error": "rules deve ser um objeto ou lista JSON"}), 400
+
+    if not isinstance(is_enabled, bool):
+        return jsonify({"error": "is_enabled deve ser booleano"}), 400
+
     conn = None
-    cur = None
+    cursor = None
+    rollback = False
+
     try:
         conn = pool.getconn()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(
-            "INSERT INTO targeting_rules (flag_name, is_enabled, rules, created_at, updated_at) "
-            "VALUES (%s, %s, %s, NOW(), NOW()) RETURNING *",
-            (flag_name, is_enabled, Json(rules_obj)) # Usa Json() para serializar
-        )
-        new_rule = cur.fetchone()
-        conn.commit()
-        log.info(f"Regra para '{flag_name}' criada com sucesso.")
-        return jsonify(new_rule), 201
-    except psycopg2.IntegrityError:
-        if conn: conn.rollback()
-        log.warning(f"Tentativa de criar regra duplicada: '{flag_name}'")
-        return jsonify({"error": f"Regra para a flag '{flag_name}' já existe"}), 409
-    except Exception as e:
-        if conn: conn.rollback()
-        log.error(f"Erro ao criar regra: {e}")
-        return jsonify({"error": "Erro interno do servidor", "details": str(e)}), 500
-    finally:
-        if cur: cur.close()
-        if conn: pool.putconn(conn)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-@app.route('/rules/<string:flag_name>', methods=['GET'])
+        cursor.execute(
+            """
+            INSERT INTO targeting_rules
+                (flag_name, is_enabled, rules, created_at, updated_at)
+            VALUES (%s, %s, %s, NOW(), NOW())
+            RETURNING *
+            """,
+            (flag_name, is_enabled, Json(rules_obj))
+        )
+
+        new_rule = cursor.fetchone()
+        conn.commit()
+
+        log.info("Regra criada para flag '%s'.", flag_name)
+        return jsonify(new_rule), 201
+
+    except psycopg2.IntegrityError:
+        rollback = True
+        log.warning("Tentativa de criar regra duplicada: '%s'.", flag_name)
+        return jsonify({
+            "error": "Regra para a flag já existe"
+        }), 409
+
+    except psycopg2.Error:
+        rollback = True
+        log.exception("Erro PostgreSQL ao criar regra.")
+
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+    except Exception:
+        rollback = True
+        log.exception("Erro inesperado ao criar regra.")
+
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+    finally:
+        release_connection(conn, cursor, rollback)
+
+
+@app.route("/rules/<string:flag_name>", methods=["GET"])
 @require_auth
 def get_rule(flag_name):
-    """ Busca uma regra de segmentação pelo nome da flag """
+    """Busca uma regra pelo nome da flag."""
     conn = None
-    cur = None
+    cursor = None
+
     try:
         conn = pool.getconn()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute("SELECT * FROM targeting_rules WHERE flag_name = %s", (flag_name,))
-        rule = cur.fetchone()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute(
+            "SELECT * FROM targeting_rules WHERE flag_name = %s",
+            (flag_name,)
+        )
+
+        rule = cursor.fetchone()
+
         if not rule:
             return jsonify({"error": "Regra não encontrada"}), 404
-        return jsonify(rule)
-    except Exception as e:
-        log.error(f"Erro ao buscar regra '{flag_name}': {e}")
-        return jsonify({"error": "Erro interno do servidor", "details": str(e)}), 500
-    finally:
-        if cur: cur.close()
-        if conn: pool.putconn(conn)
 
-@app.route('/rules/<string:flag_name>', methods=['PUT'])
+        return jsonify(rule), 200
+
+    except Exception:
+        log.exception("Erro ao buscar regra '%s'.", flag_name)
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+    finally:
+        release_connection(conn, cursor)
+
+
+@app.route("/rules/<string:flag_name>", methods=["PUT"])
 @require_auth
 def update_rule(flag_name):
-    """ Atualiza a regra de segmentação de uma flag """
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Corpo da requisição obrigatório"}), 400
+    """Atualiza uma regra de segmentação."""
+    data = get_json_body()
 
-    fields = []
-    values = []
-    
-    if 'rules' in data:
-        fields.append("rules = %s")
-        values.append(Json(data['rules'])) # Serializa o JSON
-    if 'is_enabled' in data:
-        fields.append("is_enabled = %s")
-        values.append(data['is_enabled'])
-    
-    if not fields:
-        return jsonify({"error": "Pelo menos um campo ('rules', 'is_enabled') é obrigatório"}), 400
-    
-    values.append(flag_name) # Adiciona o 'flag_name' para a cláusula WHERE
-    
-    query = f"UPDATE targeting_rules SET {', '.join(fields)} WHERE flag_name = %s RETURNING *"
-    
+    if not data:
+        return jsonify({"error": "Corpo JSON da requisição obrigatório"}), 400
+
+    has_rules = "rules" in data
+    has_enabled = "is_enabled" in data
+
+    if not has_rules and not has_enabled:
+        return jsonify({
+            "error": "Pelo menos um campo ('rules', 'is_enabled') é obrigatório"
+        }), 400
+
+    rules_obj = data.get("rules")
+    is_enabled = data.get("is_enabled")
+
+    if has_rules and not isinstance(rules_obj, (dict, list)):
+        return jsonify({"error": "rules deve ser um objeto ou lista JSON"}), 400
+
+    if has_enabled and not isinstance(is_enabled, bool):
+        return jsonify({"error": "is_enabled deve ser booleano"}), 400
+
+    if has_rules and has_enabled:
+        query = """
+            UPDATE targeting_rules
+            SET rules = %s, is_enabled = %s
+            WHERE flag_name = %s
+            RETURNING *
+        """
+        values = (Json(rules_obj), is_enabled, flag_name)
+
+    elif has_rules:
+        query = """
+            UPDATE targeting_rules
+            SET rules = %s
+            WHERE flag_name = %s
+            RETURNING *
+        """
+        values = (Json(rules_obj), flag_name)
+
+    else:
+        query = """
+            UPDATE targeting_rules
+            SET is_enabled = %s
+            WHERE flag_name = %s
+            RETURNING *
+        """
+        values = (is_enabled, flag_name)
+
     conn = None
-    cur = None
+    cursor = None
+    rollback = False
+
     try:
         conn = pool.getconn()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(query, tuple(values))
-        
-        if cur.rowcount == 0:
-            return jsonify({"error": "Regra não encontrada"}), 404
-            
-        updated_rule = cur.fetchone()
-        conn.commit()
-        log.info(f"Regra para '{flag_name}' atualizada com sucesso.")
-        return jsonify(updated_rule), 200
-    except Exception as e:
-        if conn: conn.rollback()
-        log.error(f"Erro ao atualizar regra '{flag_name}': {e}")
-        return jsonify({"error": "Erro interno do servidor", "details": str(e)}), 500
-    finally:
-        if cur: cur.close()
-        if conn: pool.putconn(conn)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-@app.route('/rules/<string:flag_name>', methods=['DELETE'])
+        cursor.execute(query, values)
+        updated_rule = cursor.fetchone()
+
+        if not updated_rule:
+            return jsonify({"error": "Regra não encontrada"}), 404
+
+        conn.commit()
+
+        log.info("Regra atualizada para flag '%s'.", flag_name)
+        return jsonify(updated_rule), 200
+
+    except Exception:
+        rollback = True
+        log.exception("Erro ao atualizar regra '%s'.", flag_name)
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+    finally:
+        release_connection(conn, cursor, rollback)
+
+
+@app.route("/rules/<string:flag_name>", methods=["DELETE"])
 @require_auth
 def delete_rule(flag_name):
-    """ Deleta a regra de segmentação de uma flag """
+    """Deleta uma regra de segmentação."""
     conn = None
-    cur = None
+    cursor = None
+    rollback = False
+
     try:
         conn = pool.getconn()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM targeting_rules WHERE flag_name = %s", (flag_name,))
-        
-        if cur.rowcount == 0:
-            return jsonify({"error": "Regra não encontrada"}), 404
-            
-        conn.commit()
-        log.info(f"Regra para '{flag_name}' deletada com sucesso.")
-        return "", 204 # 204 No Content
-    except Exception as e:
-        if conn: conn.rollback()
-        log.error(f"Erro ao deletar regra '{flag_name}': {e}")
-        return jsonify({"error": "Erro interno do servidor", "details": str(e)}), 500
-    finally:
-        if cur: cur.close()
-        if conn: pool.putconn(conn)
+        cursor = conn.cursor()
 
-if __name__ == '__main__':
+        cursor.execute(
+            "DELETE FROM targeting_rules WHERE flag_name = %s",
+            (flag_name,)
+        )
+
+        if cursor.rowcount == 0:
+            return jsonify({"error": "Regra não encontrada"}), 404
+
+        conn.commit()
+
+        log.info("Regra deletada para flag '%s'.", flag_name)
+        return "", 204
+
+    except Exception:
+        rollback = True
+        log.exception("Erro ao deletar regra '%s'.", flag_name)
+        return jsonify({"error": "Erro interno do servidor"}), 500
+
+    finally:
+        release_connection(conn, cursor, rollback)
+
+
+if __name__ == "__main__":
     port = int(os.getenv("PORT", 8003))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=port,
+        debug=False
+    )

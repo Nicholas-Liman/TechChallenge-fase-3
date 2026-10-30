@@ -1,28 +1,28 @@
-FROM golang:1.21-alpine3.17 AS builder
+FROM golang:1.25.7-alpine AS builder
 
 WORKDIR /app
 
-# 1. Configura o proxy oficial do Go (evita falhas de rede/timeout no Docker)
+# Configura o proxy oficial do Go
 ENV GOPROXY=https://proxy.golang.org,direct
 
-# O fallback direto do Go usa git para buscar os módulos.
+# Instala certificados e Git para download das dependências
 RUN apk add --no-cache ca-certificates git
 
-# 2. Copia todos os arquivos do projeto primeiro
+# Copia os arquivos do projeto
 COPY . .
 
-# 3. Executa o tidy e o download com os arquivos já no lugar
+# Organiza e baixa as dependências
 RUN go mod tidy
 RUN go mod download
 
-# 4. Compila o binário de forma estática (Garante portabilidade e que funcione em distroless)
+# Compila o binário de forma estática
 RUN CGO_ENABLED=0 GOOS=linux go build -o auth-service .
 
 FROM gcr.io/distroless/static-debian11 AS build-release-stage
 
 WORKDIR /
 
-# Copia o binário compilado no estágio builder para a raiz da imagem de release
+# Copia o binário compilado
 COPY --from=builder /app/auth-service /auth-service
 
 EXPOSE 8001

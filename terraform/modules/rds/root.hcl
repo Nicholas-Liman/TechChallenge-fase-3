@@ -46,17 +46,13 @@ inputs = {
   create_db_subnet_group = true
   subnet_ids             = dependency.vpc.outputs.private_subnets
 
-  family              = "postgres17"
+  family               = "postgres17"
   major_engine_version = "17"
 
   parameters = [
     {
       name  = "autovacuum"
       value = "1"
-    },
-    {
-      name  = "client_encoding"
-      value = "UTF8"
     }
   ]
 }

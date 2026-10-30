@@ -91,6 +91,34 @@ jobs:
           echo "Ref: $GITHUB_REF"
           echo "Event: $GITHUB_EVENT_NAME"
 
+      - name: Inspect OIDC token claims
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TOKEN_RESPONSE=$(curl -fsS \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com")
+
+          TOKEN=$(echo "$TOKEN_RESPONSE" | jq -er '.value')
+
+          export TOKEN
+
+          python3 - <<'PY'
+          import os
+          import json
+          import base64
+
+          token = os.environ["TOKEN"]
+          payload = token.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+
+          for key in ["iss", "aud", "sub", "repository", "ref"]:
+              print(f"{key}: {claims.get(key)}")
+          PY
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

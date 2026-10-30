@@ -6,7 +6,7 @@ metadata:
   name: analytics-sa
   namespace: analytics
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::217140917440:role/analytics-sa-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::854469103470:role/analytics-sa-irsa
 
 ---
 
@@ -29,7 +29,7 @@ spec:
       serviceAccountName: analytics-sa
       containers:
         - name: analytics
-          image: 217140917440.dkr.ecr.us-east-1.amazonaws.com/analytics-image:latest
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/analytics-image:c4d51749756f
           envFrom:
             - configMapRef:
                 name: configmap
@@ -103,6 +103,6 @@ spec:
       authenticationRef:
         name: aws-credentials
       metadata:
-        queueURL: "https://sqs.us-east-1.amazonaws.com/217140917440/evaluation-service-sqs"
+        queueURL: "https://sqs.us-east-1.amazonaws.com/854469103470/evaluation-service-sqs"
         queueLength: "5"
         awsRegion: "us-east-1"

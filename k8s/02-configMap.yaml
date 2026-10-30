@@ -44,7 +44,7 @@ data:
   FLAG_SERVICE_URL: "http://flag.flag.svc.cluster.local:8002"
   TARGETING_SERVICE_URL: "http://targeting.targeting.svc.cluster.local:8003"
   AWS_REGION: "us-east-1"
-  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/217140917440/evaluation-service-sqs"
+  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/854469103470/evaluation-service-sqs"
 
 ---
 
@@ -57,4 +57,4 @@ data:
   PORT: "8005"
   AWS_REGION: "us-east-1"
   AWS_DYNAMODB_TABLE: "ToggleMasterAnalytics"
-  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/217140917440/evaluation-service-sqs"
+  AWS_SQS_URL: "https://sqs.us-east-1.amazonaws.com/854469103470/evaluation-service-sqs"

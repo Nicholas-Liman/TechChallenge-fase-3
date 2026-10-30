@@ -12,7 +12,7 @@ remote_state {
   }
 
   config = {
-    bucket = "first-terraform-state-25-10-2026"
+    bucket = "togglemaster-fase3-tfstate-854469103470"
 
     # Key é o caminho/nome do arquivo no bucket S3. Onde o estado da nossa infraestrutura será armazenado
     key = "${path_relative_to_include()}/terraform.tfstate"

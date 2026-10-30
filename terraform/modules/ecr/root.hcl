@@ -8,7 +8,7 @@ inputs = {
   repository_type = "private"
 
   # Permite o destroy mesmo com imagens dentro do repositório
-  repository_force_delete = true
+  repository_force_delete = false
 
   # Sem ARNs extras: quem tem acesso é a própria conta (seu usuário e a role dos nodes do EKS)
   repository_read_write_access_arns = []

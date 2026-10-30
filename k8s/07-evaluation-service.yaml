@@ -6,7 +6,7 @@ metadata:
   name: evaluation-sa
   namespace: evaluation
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::217140917440:role/evaluation-sa-irsa
+    eks.amazonaws.com/role-arn: arn:aws:iam::854469103470:role/evaluation-sa-irsa
 
 ---
 
@@ -29,7 +29,7 @@ spec:
       serviceAccountName: evaluation-sa
       containers:
         - name: evaluation
-          image: 217140917440.dkr.ecr.us-east-1.amazonaws.com/evaluation-image:latest
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/evaluation-image:c4d51749756f
           envFrom:
             - configMapRef:
                 name: configmap

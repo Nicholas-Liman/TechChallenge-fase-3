@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: targeting
-          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/targeting-image:c4d51749756f
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/targeting-image:448f9b850d067f10946072ead1eb25fbeb0b4ce6
           envFrom:
             - configMapRef:
                 name: configmap

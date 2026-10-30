@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: flag
-          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/flag-image:c4d51749756f
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/flag-image:4ecefab282129c17b2122e251d9bdc526e9f2c9c
           envFrom:
             - configMapRef:
                 name: configmap

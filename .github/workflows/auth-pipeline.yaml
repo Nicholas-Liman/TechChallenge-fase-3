@@ -51,10 +51,12 @@ jobs:
       - name: Run Go tests
         run: go test ./...
 
+      - name: Install Gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
       - name: Run Gosec
-        uses: securego/gosec@master
-        with:
-          args: ./...
+        run: |
+          "$(go env GOPATH)/bin/gosec" ./...
 
       - name: Scan dependencies with Trivy
         uses: aquasecurity/trivy-action@master

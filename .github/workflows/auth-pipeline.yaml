@@ -1,0 +1,84 @@
+
+name: Auth Service Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "FIAP-DevOps-Fase-02/services/auth-service/**"
+      - ".github/workflows/auth-pipeline.yaml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-security:
+    name: Build and Security Analysis
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: FIAP-DevOps-Fase-02/services/auth-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+          cache-dependency-path: FIAP-DevOps-Fase-02/services/auth-service/go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go files need formatting:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Run Go vet
+        run: go vet ./...
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Run Gosec
+        uses: securego/gosec@master
+        with:
+          args: ./...
+
+      - name: Scan dependencies with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: FIAP-DevOps-Fase-02/services/auth-service
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Build application
+        run: CGO_ENABLED=0 GOOS=linux go build -o auth-service .
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t auth-image:${{ github.sha }} \
+            .
+
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: auth-image:${{ github.sha }}
+          scan-type: image
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true

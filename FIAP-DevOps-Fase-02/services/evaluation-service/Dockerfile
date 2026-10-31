@@ -1,15 +1,22 @@
-FROM golang:1.24-alpine AS build-stage
+
+# Build stage
+FROM golang:1.25.7-alpine AS build-stage
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
+
 RUN go mod download
 
 COPY *.go ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /evaluation-service .
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /evaluation-service .
 
-FROM gcr.io/distroless/base-debian11 AS build-release-stage
+# Runtime stage
+FROM gcr.io/distroless/static-debian13:nonroot AS build-release-stage
 
 WORKDIR /
 

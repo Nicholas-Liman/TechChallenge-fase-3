@@ -1,0 +1,98 @@
+
+name: Evaluation Service Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "FIAP-DevOps-Fase-02/services/evaluation-service/**"
+      - ".github/workflows/evaluation-service-pipeline.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-security:
+    name: Build, Security and ECR
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: FIAP-DevOps-Fase-02/services/evaluation-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.7"
+          cache: true
+          cache-dependency-path: FIAP-DevOps-Fase-02/services/evaluation-service/go.sum
+
+      - name: Check formatting
+        run: |
+          test -z "$(gofmt -l *.go)"
+
+      - name: Run Go vet
+        run: go vet ./...
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Install Gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.29.0
+
+      - name: Run Gosec
+        run: |
+            $HOME/go/bin/gosec \
+                -severity medium \
+                -confidence medium \
+                ./...
+
+      - name: Scan filesystem with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: FIAP-DevOps-Fase-02/services/evaluation-service
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t evaluation-image:${{ github.sha }} \
+            .
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: evaluation-image:${{ github.sha }}
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::854469103470:role/GitHubActionsAuthECRRole
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: evaluation-image
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker tag evaluation-image:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+          docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}

@@ -29,7 +29,7 @@ spec:
       serviceAccountName: evaluation-sa
       containers:
         - name: evaluation
-          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/evaluation-image:c4d51749756f
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/evaluation-image:b1f3cacf6e22fe98023e45774cfb3bcaae920dec
           envFrom:
             - configMapRef:
                 name: configmap

@@ -2,14 +2,14 @@
   <a href="https://www.fiap.com.br/"><img src="assets/fiap-logo.svg" alt="FIAP" width="240"></a>
 </p>
 
-<h3 align="center">POSTECH DevOps e Arquitetura Cloud · Tech Challenge · Fase 2</h3>
+<h3 align="center">POSTECH DevOps e Arquitetura Cloud · Tech Challenge · Fase 3</h3>
 
 <p align="center">
-  <b>ToggleMaster</b>: 5 microsserviços conteinerizados e orquestrados no Kubernetes da AWS (EKS)
+  <b>ToggleMaster</b>: Serviços de terraform e Kubernetes da AWS (EKS)
 </p>
 
 <p align="center">
-  📄 <a href="docs/tech-challenge-fase-3.pdf"><b>Clique aqui para ver o enunciado do desafio (PDF)</b></a>
+  📄 <a href="tech-challenge-fase-3.pdf"><b>Clique aqui para ver o enunciado do desafio (PDF)</b></a>
 </p>
 
 ---

@@ -29,7 +29,7 @@ spec:
       serviceAccountName: analytics-sa
       containers:
         - name: analytics
-          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/analytics-image:c89c9248438c62851413bdab6237a6efda065225
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/analytics-image:8dacf34541ceee24b2b90fba8afbb4b54e007762
           envFrom:
             - configMapRef:
                 name: configmap

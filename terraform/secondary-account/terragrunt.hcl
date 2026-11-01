@@ -10,6 +10,7 @@ remote_state {
     bucket       = "togglemaster-targeting-tfstate-213005831258"
     key          = "${path_relative_to_include()}/terraform.tfstate"
     region       = "us-east-1"
+    profile      = "togglemaster-secondary"
     encrypt      = true
     use_lockfile = true
   }

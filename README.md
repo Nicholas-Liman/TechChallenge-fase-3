@@ -1,15 +1,17 @@
 <p align="center">
-  <a href="https://www.fiap.com.br/"><img src="assets/fiap-logo.svg" alt="FIAP" width="240"></a>
+  <a href="https://www.fiap.com.br/">
+    <img src="docs/fiap%20logo.png" alt="FIAP" width="240">
+  </a>
 </p>
 
-<h3 align="center">POSTECH DevOps e Arquitetura Cloud · Tech Challenge · Fase 3</h3>
+<h3 align="center">POSTECH DevOps e Arquitetura Cloud · Tech Challenge · Fases 2 e 3</h3>
 
 <p align="center">
-  <b>ToggleMaster</b>: Serviços de terraform e Kubernetes da AWS (EKS)
+  <b>ToggleMaster</b>: plataforma de Feature Flags baseada em microsserviços, AWS, Kubernetes, Terraform, DevSecOps e GitOps.
 </p>
 
 <p align="center">
-  📄 <a href="tech-challenge-fase-3.pdf"><b>Clique aqui para ver o enunciado do desafio (PDF)</b></a>
+  <a href="docs/POSTECH%20-%20Tech%20Challenge%20-%20Fase%203.pdf"><b>Enunciado do desafio — Fase 3 (PDF)</b></a>
 </p>
 
 ---
@@ -371,8 +373,9 @@ Os diretórios principais do projeto estão organizados da seguinte forma:
 .
 ├── .github/
 │   └── workflows/                  # Pipelines dos cinco microsserviços
-├── assets/                          # Imagens e identidade visual do README
-├── docs/                            # Enunciados e documentação de apoio
+├── docs/                            # Enunciado da Fase 3 e identidade visual
+│   ├── POSTECH - Tech Challenge - Fase 3.pdf
+│   └── fiap logo.png
 ├── FIAP-DevOps-Fase-02/
 │   └── services/                    # Código-fonte e Dockerfiles dos serviços
 │       ├── analytics-service/
@@ -611,5 +614,5 @@ Desenvolvido por **Nicholas Lima**.
 ---
 
 <p align="center">
-  <a href="docs/tech-challenge-fase-2.pdf">Enunciado do Tech Challenge — Fase 2</a>
+  <a href="docs/POSTECH%20-%20Tech%20Challenge%20-%20Fase%203.pdf">Enunciado do Tech Challenge — Fase 3</a>
 </p>

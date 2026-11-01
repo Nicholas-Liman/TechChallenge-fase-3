@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -88,3 +88,56 @@ jobs:
         run: |
           docker tag analytics-image:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
           docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+
+      - name: Update GitOps manifest
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          manifest = Path("k8s/08-analytics-service.yaml")
+          content = manifest.read_text()
+
+          pattern = (
+              r"(^\s*image:\s*"
+              r"854469103470\.dkr\.ecr\.us-east-1\.amazonaws\.com/"
+              r"analytics-image:)[^\s]+"
+          )
+
+          updated, count = re.subn(
+              pattern,
+              lambda match: match.group(1) + os.environ["IMAGE_TAG"],
+              content,
+              flags=re.MULTILINE
+          )
+
+          if count != 1:
+              raise SystemExit(
+                  f"Esperada exatamente uma imagem analytics-image; encontradas: {count}"
+              )
+
+          manifest.write_text(updated)
+
+          print(
+              "Manifesto atualizado para: "
+              "854469103470.dkr.ecr.us-east-1.amazonaws.com/"
+              f"analytics-image:{os.environ['IMAGE_TAG']}"
+          )
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add k8s/08-analytics-service.yaml
+
+          if git diff --cached --quiet; then
+            echo "Manifesto já está atualizado."
+          else
+            git commit -m "deploy(analytics): update image to ${IMAGE_TAG}"
+            git push
+          fi

@@ -1,17 +1,15 @@
 <p align="center">
-  <a href="https://www.fiap.com.br/">
-    <img src="assets/fiap-logo.svg" alt="FIAP" width="240">
-  </a>
+  <a href="https://www.fiap.com.br/"><img src="assets/fiap-logo.svg" alt="FIAP" width="240"></a>
 </p>
 
-<h3 align="center">POSTECH DevOps e Arquitetura Cloud · Tech Challenge · Fases 2 e 3</h3>
+<h3 align="center">POSTECH DevOps e Arquitetura Cloud · Tech Challenge · Fase 2</h3>
 
 <p align="center">
-  <b>ToggleMaster</b>: plataforma de Feature Flags baseada em microsserviços, AWS, Kubernetes, Terraform, DevSecOps e GitOps.
+  <b>ToggleMaster</b>: 5 microsserviços conteinerizados e orquestrados no Kubernetes da AWS (EKS)
 </p>
 
 <p align="center">
-  <a href="docs/tech-challenge-fase-2.pdf"><b>Enunciado do desafio — Fase 2 (PDF)</b></a>
+  📄 <a href="docs/tech-challenge-fase-3.pdf"><b>Clique aqui para ver o enunciado do desafio (PDF)</b></a>
 </p>
 
 ---

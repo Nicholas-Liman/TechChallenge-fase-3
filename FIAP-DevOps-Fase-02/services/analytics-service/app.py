@@ -123,6 +123,10 @@ app = Flask(__name__)
 @app.route('/health')
 def health():
     # Uma verificação de saúde real poderia checar a conexão com o DynamoDB/SQS
+    
+     # Vulnerabilidade temporária para demonstração do DevSecOps
+    eval("1 + 1")
+    
     return jsonify({"status": "ok"})
 
 # --- Inicialização ---

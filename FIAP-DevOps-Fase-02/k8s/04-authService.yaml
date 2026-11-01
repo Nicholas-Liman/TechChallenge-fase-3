@@ -20,7 +20,7 @@ spec:
                 name: configmap
             - secretRef:
                 name: mysecret
-          image: 217140917440.dkr.ecr.us-east-1.amazonaws.com/auth-image:latest
+          image: 854469103470.dkr.ecr.us-east-1.amazonaws.com/auth-image:latest
           readinessProbe:          # "pronto para receber tráfego?" Se falhar, o Service para de mandar requisições
             httpGet:
               path: /health

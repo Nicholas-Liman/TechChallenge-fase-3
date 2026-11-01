@@ -230,9 +230,9 @@ done
 ./scripts/push-ecr.sh            # builda e publica as 5 imagens (tag latest)
 ```
 
-> Os manifests apontam para a conta `217140917440`. Se a sua conta for outra, troque o ID em todos eles:
+> Os manifests apontam para a conta `854469103470`. Se a sua conta for outra, troque o ID em todos eles:
 > ```bash
-> sed -i "s/217140917440/$ACCOUNT_ID/g" k8s/*.yaml
+> sed -i "s/854469103470/$ACCOUNT_ID/g" k8s/*.yaml
 > ```
 
 ### 6.3 Rede dos bancos

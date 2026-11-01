@@ -1,36 +1,34 @@
-FROM ubuntu:20.04 as builder
-ARG DEBIAN_FRONTEND=noninteractive
-WORKDIR /app
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    python3.9 \
-    python3.9-dev \
-    python3-pip \
-    python3.9-venv \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+FROM python:3.12-slim-bookworm AS builder
 
-RUN python3.9 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV=/opt/venv
+RUN python -m venv "$VIRTUAL_ENV"
+
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+WORKDIR /app
 
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 
-FROM ubuntu:20.04 AS runner-image
+FROM python:3.12-slim-bookworm AS runtime
 
-ARG DEBIAN_FRONTEND=noninteractive
+ENV VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install --no-install-recommends -y python3.9 python3-venv && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN groupadd --system app \
+    && useradd --system --gid app --home-dir /app --no-create-home app
 
 COPY --from=builder /opt/venv /opt/venv
-COPY . .
+COPY --chown=app:app app.py ./app.py
 
-# activate virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+USER app
 
 EXPOSE 8005
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8005", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8005", "--workers", "1", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
